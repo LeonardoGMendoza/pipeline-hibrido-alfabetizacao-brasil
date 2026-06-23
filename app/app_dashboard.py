@@ -32,33 +32,19 @@ def carregar_pipeline_data():
     nos parâmetros reais da Pesquisa Alfabetiza Brasil.
     """
     try:
-        # Aqui entraria a conexão real do Caio: pymongo.MongoClient()
-        # Como estamos na fase de homologação, estruturamos o DataFrame analítico
-        municipios = [
-            'São Paulo', 'Campinas', 'Ribeirão Preto', 'Franca', 'Santos', 
-            'São Bernardo do Campo', 'São José dos Campos', 'Sorocaba', 'Osasco', 'Mogi das Cruzes'
-        ]
+        # Lendo os dados analíticos reais da Camada Gold processada pelo pipeline
+        # Esta tabela contém a consolidação de municípios, proficiência e vulnerabilidade
+        df = pd.read_parquet('data/gold/indicador_alfabetizacao.parquet')
         
-        np.random.seed(42) # Reprodutibilidade estatística exigida por MLOps
-        
-        dados = {
-            'municipio': municipios,
-            'estado': ['SP'] * len(municipios),
-            # Gerando proficiências realistas ao redor do ponto crítico de 743 pontos
-            'proficiencia_media': [731.8, 729.5, 748.0, 765.2, 752.1, 744.3, 758.9, 736.4, 721.0, 749.6],
-            'qtd_alunos_avaliados': [19500, 4300, 2800, 1450, 1900, 3100, 2400, 2900, 5100, 1800],
-            'vulnerabilidade_social': ['Alta', 'Média', 'Baixa', 'Média', 'Baixa', 'Média', 'Baixa', 'Média', 'Alta', 'Média']
-        }
-        
-        df = pd.DataFrame(dados)
-        
-        # 🎯 Regra de Ouro da FIAP: Ponto de corte científico (Saeb 2023)
-        df['status_alfabetizacao'] = df['proficiencia_media'].apply(
-            lambda x: 'Alfabetizado (≥ 743 pts)' if x >= 743 else 'Atenção (< 743 pts)'
-        )
+        # O processamento da regra de negócio (>= 743 pts) já deve vir pronto da Gold, 
+        # mas como fallback de segurança visual, garantimos a classificação aqui.
+        if 'status_alfabetizacao' not in df.columns:
+            df['status_alfabetizacao'] = df['proficiencia_media'].apply(
+                lambda x: 'Alfabetizado (≥ 743 pts)' if x >= 743 else 'Atenção (< 743 pts)'
+            )
         return df
     except Exception as e:
-        st.error(f"Falha crítica na conexão com a camada Gold NoSQL: {e}")
+        st.error(f"Falha crítica na conexão com a camada Gold. Verifique se o pipeline processou os dados: {e}")
         return pd.DataFrame()
 
 df = carregar_pipeline_data()
