@@ -14,7 +14,7 @@ class BatchIngestionReal:
         self.micro_dir = os.path.join(self.source_dir, "microdados_AEEB_2025", "DADOS")
         
     def copy_to_raw(self):
-        print("📥 [RAW] Copiando arquivos originais do INEP...")
+        print("[RAW] Copiando arquivos originais do INEP...")
         files_to_copy = [
             (os.path.join(self.source_dir, "resultados_e_metas_municipios_2025_v2.xlsx"), "metas_municipios.xlsx"),
             (os.path.join(self.source_dir, "resultados_e_metas_ufs_2025_v1.xlsx"), "metas_ufs.xlsx"),
@@ -32,40 +32,55 @@ class BatchIngestionReal:
                 print(f"  ⚠️ Arquivo não encontrado: {src}")
 
     def convert_to_bronze(self):
-        print("\n⚙️ [BRONZE] Convertendo Raw para Parquet (Eficiência FinOps)...")
+        print("\n[BRONZE] Convertendo Raw para Parquet (Eficiencia FinOps)...")
         
+        def safe_to_parquet(df, path):
+            # Converte colunas 'object' para string para evitar ArrowTypeError
+            for col in df.select_dtypes(include=['object']).columns:
+                df[col] = df[col].astype(str)
+            df.to_parquet(path, index=False)
+
         # 1. Metas Municipios (Excel)
         if os.path.exists(f"{self.raw_dir}metas_municipios.xlsx"):
-            print("  Convertendo Metas Municipios...")
-            df_metas_mun = pd.read_excel(f"{self.raw_dir}metas_municipios.xlsx")
-            df_metas_mun.to_parquet(f"{self.bronze_dir}metas_municipios.parquet", index=False)
+            try:
+                print("  Convertendo Metas Municipios...")
+                df_metas_mun = pd.read_excel(f"{self.raw_dir}metas_municipios.xlsx")
+                safe_to_parquet(df_metas_mun, f"{self.bronze_dir}metas_municipios.parquet")
+            except Exception as e: print(f"Erro em Metas Municipios: {e}")
             
         # 2. Metas UFs (Excel)
         if os.path.exists(f"{self.raw_dir}metas_ufs.xlsx"):
-            print("  Convertendo Metas UFs...")
-            df_metas_ufs = pd.read_excel(f"{self.raw_dir}metas_ufs.xlsx")
-            df_metas_ufs.to_parquet(f"{self.bronze_dir}metas_ufs.parquet", index=False)
+            try:
+                print("  Convertendo Metas UFs...")
+                df_metas_ufs = pd.read_excel(f"{self.raw_dir}metas_ufs.xlsx")
+                safe_to_parquet(df_metas_ufs, f"{self.bronze_dir}metas_ufs.parquet")
+            except Exception as e: print(f"Erro em Metas UFs: {e}")
             
-        # 3. TS_ALUNO (CSV pesado, precisa de chunking ou leitura direta com PyArrow se possível)
-        # Por simplicidade e segurança de memória, vamos ler com pandas (se aguentar) ou pyarrow engine
+        # 3. TS_ALUNO
         if os.path.exists(f"{self.raw_dir}TS_ALUNO.csv"):
-            print("  Convertendo TS_ALUNO (Microdados pesados)... aguarde...")
-            df_aluno = pd.read_csv(f"{self.raw_dir}TS_ALUNO.csv", sep=';', encoding='utf-8', engine='pyarrow')
-            df_aluno.to_parquet(f"{self.bronze_dir}TS_ALUNO.parquet", index=False)
+            try:
+                print("  Convertendo TS_ALUNO (Microdados pesados)... aguarde...")
+                df_aluno = pd.read_csv(f"{self.raw_dir}TS_ALUNO.csv", sep=';', encoding='latin1', low_memory=False)
+                safe_to_parquet(df_aluno, f"{self.bronze_dir}TS_ALUNO.parquet")
+            except Exception as e: print(f"Erro em TS_ALUNO: {e}")
             
         # 4. TS_MUNICIPIO
         if os.path.exists(f"{self.raw_dir}TS_MUNICIPIO.csv"):
-            print("  Convertendo TS_MUNICIPIO...")
-            df_mun = pd.read_csv(f"{self.raw_dir}TS_MUNICIPIO.csv", sep=';', encoding='utf-8')
-            df_mun.to_parquet(f"{self.bronze_dir}TS_MUNICIPIO.parquet", index=False)
+            try:
+                print("  Convertendo TS_MUNICIPIO...")
+                df_mun = pd.read_csv(f"{self.raw_dir}TS_MUNICIPIO.csv", sep=';', encoding='latin1', low_memory=False)
+                safe_to_parquet(df_mun, f"{self.bronze_dir}TS_MUNICIPIO.parquet")
+            except Exception as e: print(f"Erro em TS_MUNICIPIO: {e}")
 
         # 5. TS_ESTADO
         if os.path.exists(f"{self.raw_dir}TS_ESTADO.csv"):
-            print("  Convertendo TS_ESTADO...")
-            df_est = pd.read_csv(f"{self.raw_dir}TS_ESTADO.csv", sep=';', encoding='utf-8')
-            df_est.to_parquet(f"{self.bronze_dir}TS_ESTADO.parquet", index=False)
+            try:
+                print("  Convertendo TS_ESTADO...")
+                df_est = pd.read_csv(f"{self.raw_dir}TS_ESTADO.csv", sep=';', encoding='latin1', low_memory=False)
+                safe_to_parquet(df_est, f"{self.bronze_dir}TS_ESTADO.parquet")
+            except Exception as e: print(f"Erro em TS_ESTADO: {e}")
             
-        print("✅ [BRONZE] Todos os arquivos convertidos para Parquet com sucesso!")
+        print("[BRONZE] Todos os arquivos convertidos para Parquet com sucesso!")
 
 if __name__ == '__main__':
     ingestor = BatchIngestionReal()
