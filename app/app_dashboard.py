@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 
+
 # ==============================================================================
 # 1. ARQUITETURA DA INTERFACE & CONFIGURAÇÕES EXECUTIVAS
 # ==============================================================================
