@@ -56,23 +56,33 @@ st.sidebar.markdown("# ⚙️ Painel de Controle")
 st.sidebar.title("Filtros Estratégicos")
 st.sidebar.markdown("Use os parâmetros abaixo para simular cenários de corte orçamentário e intervenção:")
 
+if not df.empty:
+    status_options = df['status_alfabetizacao'].unique()
+    vuln_options = df['vulnerabilidade_social'].unique()
+else:
+    status_options = []
+    vuln_options = []
+
 status_selecionado = st.sidebar.multiselect(
     "Filtrar por Status Saeb:",
-    options=df['status_alfabetizacao'].unique(),
-    default=df['status_alfabetizacao'].unique()
+    options=status_options,
+    default=status_options
 )
 
 vulnerabilidade_selecionada = st.sidebar.multiselect(
     "Nível de Vulnerabilidade Social:",
-    options=df['vulnerabilidade_social'].unique(),
-    default=df['vulnerabilidade_social'].unique()
+    options=vuln_options,
+    default=vuln_options
 )
 
 # Aplicando os filtros dinamicamente
-df_filtrado = df[
-    (df['status_alfabetizacao'].isin(status_selecionado)) &
-    (df['vulnerabilidade_social'].isin(vulnerabilidade_selecionada))
-]
+if not df.empty:
+    df_filtrado = df[
+        (df['status_alfabetizacao'].isin(status_selecionado)) &
+        (df['vulnerabilidade_social'].isin(vulnerabilidade_selecionada))
+    ]
+else:
+    df_filtrado = pd.DataFrame()
 
 # ==============================================================================
 # 4. STORYTELLING VISUAL & PAINEL DE CONTROLE EXECUTIVO
@@ -81,32 +91,33 @@ st.title("🏫 Monitor de Performance - Compromisso Nacional Criança Alfabetiza
 st.caption("Fase 2: Data Architecture, Pipeline Medallion e Persistência Poliglota NoSQL")
 st.markdown("---")
 
-# 📊 Camada de Métricas Principais (KPI Cards)
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric(label="🏙️ Municípios Monitorados", value=f"{df_filtrado['municipio'].nunique()}")
-with col2:
-    st.metric(label="👶 Alunos Avaliados", value=f"{df_filtrado['qtd_alunos_avaliados'].sum():,}")
-with col3:
-    prof_global = df_filtrado['proficiencia_media'].mean() if not df_filtrado.empty else 0
-    st.metric(label="📈 Proficiência Média Global", value=f"{prof_global:.1f} pts")
-with col4:
-    # Vinculando o trabalho do Caio e Leonardo com maestria técnica
-    st.metric(label="🔋 Camada de Persistência", value="NoSQL Actived", delta="Spark Pipeline Link OK")
+if df_filtrado.empty:
+    st.warning("⚠️ Nenhum dado disponível ou localizado com os filtros selecionados.")
+else:
+    # 📊 Camada de Métricas Principais (KPI Cards)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric(label="🏙️ Municípios Monitorados", value=f"{df_filtrado['municipio'].nunique()}")
+    with col2:
+        st.metric(label="👶 Alunos Avaliados", value=f"{df_filtrado['qtd_alunos_avaliados'].sum():,}".replace(',', '.'))
+    with col3:
+        prof_global = df_filtrado['proficiencia_media'].mean()
+        st.metric(label="📈 Proficiência Média Global", value=f"{prof_global:.1f} pts")
+    with col4:
+        st.metric(label="🔋 Camada de Persistência", value="NoSQL Actived", delta="Spark Pipeline Link OK")
 
-st.markdown("---")
+    st.markdown("---")
 
-# 📉 Distribuição Gráfica Avançada
-col_esq, col_dir = st.columns([2, 3]) # Coluna da direita levemente maior para melhor leitura do gráfico de barras
+    # 📉 Distribuição Gráfica Avançada
+    col_esq, col_dir = st.columns([2, 3])
 
-mapa_cores = {
-    'Alfabetizado (≥ 743 pts)': '#2ecc71', 
-    'Atenção (< 743 pts)': '#e74c3c'
-}
+    mapa_cores = {
+        'Alfabetizado (≥ 743 pts)': '#2ecc71', 
+        'Atenção (< 743 pts)': '#e74c3c'
+    }
 
-with col_esq:
-    st.subheader("🎯 Concentração por Status de Proficiência")
-    if not df_filtrado.empty:
+    with col_esq:
+        st.subheader("🎯 Concentração por Status de Proficiência")
         fig_pie = px.pie(
             df_filtrado, 
             names='status_alfabetizacao', 
@@ -118,12 +129,9 @@ with col_esq:
         )
         fig_pie.update_layout(margin=dict(t=20, b=20, l=10, r=10), showlegend=True)
         st.plotly_chart(fig_pie, use_container_width=True)
-    else:
-        st.warning("Nenhum dado selecionado nos filtros laterais.")
 
-with col_dir:
-    st.subheader("📊 Performance de Proficiência por Município")
-    if not df_filtrado.empty:
+    with col_dir:
+        st.subheader("📊 Performance de Proficiência por Município")
         fig_bar = px.bar(
             df_filtrado.sort_values(by='proficiencia_media', ascending=False), 
             x='municipio', 
@@ -135,7 +143,6 @@ with col_dir:
             labels={'municipio': 'Município', 'proficiencia_media': 'Proficiência Média (SAEB)'}
         )
         
-        # Linha de corte científica padrão SOTA
         fig_bar.add_hline(
             y=743, 
             line_dash="dash", 
@@ -146,7 +153,7 @@ with col_dir:
         fig_bar.update_layout(yaxis_range=[680, 790], margin=dict(t=20, b=20, l=10, r=10))
         st.plotly_chart(fig_bar, use_container_width=True)
 
-# 📑 Nota de Rodapé e Alinhamento de Negócio (Apoio à Documentação da Winny)
+# 📑 Nota de Rodapé e Alinhamento de Negócio
 st.markdown("---")
 st.info(
     "💡 **Análise de Negócio & Governança (CRISP-DM):** Este painel consome a tabela consolidada na camada Gold. "
