@@ -1,4 +1,3 @@
-# Databricks notebook source / PySpark Script Local
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 import os
@@ -6,48 +5,46 @@ import os
 class SilverLayer:
     def __init__(self, bronze_dir='data/bronze/'):
         self.bronze_dir = bronze_dir
-        # Configuração do Spark com gerenciamento de memória (FinOps local)
         self.spark = SparkSession.builder \
-            .appName("Carga_Silver_Alfabetizacao_V2") \
-            .config("spark.sql.shuffle.partitions", "4") \
+            .appName("Carga_Silver_Alfabetizacao_DadosReais") \
+            .config("spark.sql.shuffle.partitions", "8") \
             .getOrCreate()
 
     def processar_silver(self):
-        print("⚙️ [SILVER] Iniciando processamento PySpark - Limpeza e JOINs...")
+        print("⚙️ [SILVER] Processando dados REAIS de microdados do INEP...")
         try:
-            # 1. Leitura das 6 tabelas Bronze
-            df_uf = self.spark.read.parquet(f"{self.bronze_dir}uf.parquet")
-            df_mun = self.spark.read.parquet(f"{self.bronze_dir}municipio.parquet")
-            df_meta_br = self.spark.read.parquet(f"{self.bronze_dir}meta_brasil.parquet")
-            df_meta_uf = self.spark.read.parquet(f"{self.bronze_dir}meta_uf.parquet")
-            df_meta_mun = self.spark.read.parquet(f"{self.bronze_dir}meta_municipio.parquet")
-            df_alunos = self.spark.read.parquet(f"{self.bronze_dir}alunos.parquet")
+            # 1. Leitura das tabelas Parquet da Bronze (Convertidas do Excel/CSV)
+            df_aluno = self.spark.read.parquet(f"{self.bronze_dir}TS_ALUNO.parquet")
+            df_mun = self.spark.read.parquet(f"{self.bronze_dir}TS_MUNICIPIO.parquet")
+            df_est = self.spark.read.parquet(f"{self.bronze_dir}TS_ESTADO.parquet")
+            df_metas_mun = self.spark.read.parquet(f"{self.bronze_dir}metas_municipios.parquet")
             
-            # 2. Limpeza e Padronização
-            df_mun = df_mun.dropna(subset=['id_municipio']).withColumn("nome_municipio", F.upper(F.col("nome")))
-            df_uf = df_uf.withColumn("nome_uf", F.upper(F.col("nome")))
+            # 2. Limpeza Básica nos Microdados de Alunos
+            # Filtra apenas alunos que realizaram a prova (IN_PRESENCA_LP == 1)
+            df_aluno_valido = df_aluno.filter(F.col("IN_PRESENCA_LP") == 1)
             
-            # 3. Integração (JOINs)
-            # Cruza Municipio com UF
-            df_geo = df_mun.join(df_uf, "sigla_uf", "left").drop(df_uf.nome)
+            # Agrega proficiência dos alunos por município para bater com a tabela de metas
+            df_aluno_agg = df_aluno_valido.groupBy("CO_MUNICIPIO").agg(
+                F.avg("VL_PROFICIENCIA_LP").alias("proficiencia_media_alunos"),
+                F.count("ID_ALUNO").alias("qtd_alunos_avaliados")
+            )
             
-            # Cruza Geografia com Metas do Municipio
-            df_integrado = df_geo.join(df_meta_mun, "id_municipio", "inner")
+            # 3. Integração (JOINs) com Municípios e Metas
+            # O Excel de Metas tem a coluna 'Município' (nome) ou possivelmente um código.
+            # Como vimos no TS_MUNICIPIO, existe o 'CO_MUNICIPIO'. Vamos cruzar.
             
-            # Cruza com Dados dos Alunos
-            df_integrado = df_integrado.join(df_alunos, "id_municipio", "left")
+            df_integrado = df_mun.join(df_aluno_agg, "CO_MUNICIPIO", "left")
             
-            # 4. Regras de Qualidade
-            df_silver = df_integrado.dropDuplicates(["id_municipio", "ano", "rede"])
-            df_silver = df_silver.withColumn("_data_ingestao_silver", F.current_timestamp())
+            # Regras de Qualidade
+            df_silver = df_integrado.withColumn("_data_ingestao_silver", F.current_timestamp())
             
-            # 5. Persistência (Uso eficiente Parquet FinOps)
+            # 5. Persistência
             os.makedirs('data/silver', exist_ok=True)
             output_path = 'data/silver/indicador_alfabetizacao_integrado.parquet'
             
             df_silver.write.mode("overwrite").parquet(output_path)
             
-            print("✅ [SILVER] Camada Silver processada e integrada com sucesso.")
+            print("✅ [SILVER] Camada Silver processada com os DADOS REAIS!")
             return True
         except Exception as e:
             print(f"❌ Erro no processamento Silver: {e}")

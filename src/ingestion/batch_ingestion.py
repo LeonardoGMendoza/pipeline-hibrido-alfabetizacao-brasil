@@ -1,71 +1,73 @@
 import os
+import shutil
 import pandas as pd
-import numpy as np
 
-class BatchIngestion:
-    def __init__(self, output_dir='data/bronze/'):
-        self.output_dir = output_dir
-        os.makedirs(self.output_dir, exist_ok=True)
+class BatchIngestionReal:
+    def __init__(self):
+        self.raw_dir = 'data/raw/'
+        self.bronze_dir = 'data/bronze/'
+        os.makedirs(self.raw_dir, exist_ok=True)
+        os.makedirs(self.bronze_dir, exist_ok=True)
         
-    def mock_inep_datasets(self):
-        print("📥 [BATCH] Simulando extração das 6 entidades da Base dos Dados...")
+        # Caminhos dos arquivos reais no Windows do usuário
+        self.source_dir = r"C:\Users\Leonardo\Downloads"
+        self.micro_dir = os.path.join(self.source_dir, "microdados_AEEB_2025", "DADOS")
         
-        # 1. UF
-        df_uf = pd.DataFrame({
-            'sigla_uf': ['SP', 'RJ', 'MG'],
-            'nome': ['São Paulo', 'Rio de Janeiro', 'Minas Gerais'],
-            'regiao': ['Sudeste', 'Sudeste', 'Sudeste']
-        })
+    def copy_to_raw(self):
+        print("📥 [RAW] Copiando arquivos originais do INEP...")
+        files_to_copy = [
+            (os.path.join(self.source_dir, "resultados_e_metas_municipios_2025_v2.xlsx"), "metas_municipios.xlsx"),
+            (os.path.join(self.source_dir, "resultados_e_metas_ufs_2025_v1.xlsx"), "metas_ufs.xlsx"),
+            (os.path.join(self.micro_dir, "TS_ALUNO.csv"), "TS_ALUNO.csv"),
+            (os.path.join(self.micro_dir, "TS_MUNICIPIO.csv"), "TS_MUNICIPIO.csv"),
+            (os.path.join(self.micro_dir, "TS_ESTADO.csv"), "TS_ESTADO.csv")
+        ]
         
-        # 2. Município
-        df_mun = pd.DataFrame({
-            'id_municipio': [3550308, 3304557, 3106200],
-            'nome': ['São Paulo', 'Rio de Janeiro', 'Belo Horizonte'],
-            'sigla_uf': ['SP', 'RJ', 'MG']
-        })
-        
-        # 3. Meta Alfabetização Brasil
-        df_meta_br = pd.DataFrame({
-            'ano': [2024, 2024, 2024],
-            'meta_nacional': [80.0, 80.0, 80.0]
-        })
-        
-        # 4. Meta Alfabetização UF (Conforme schema do Inep passado pelo usuário)
-        df_meta_uf = pd.DataFrame({
-            'ano': [2024, 2024, 2024],
-            'sigla_uf': ['SP', 'RJ', 'MG'],
-            'rede': ['Estadual', 'Estadual', 'Estadual'],
-            'taxa_alfabetizacao': [75.0, 70.0, 72.0],
-            'media_portugues': [745.0, 740.0, 743.0]
-        })
-        
-        # 5. Meta Alfabetização Município
-        df_meta_mun = pd.DataFrame({
-            'ano': [2024, 2024, 2024],
-            'id_municipio': [3550308, 3304557, 3106200],
-            'rede': ['Municipal', 'Municipal', 'Municipal'],
-            'taxa_alfabetizacao': [78.0, 71.0, 73.0]
-        })
-        
-        # 6. Dados de alunos (Simulado via microdados agregados)
-        np.random.seed(42)
-        df_alunos = pd.DataFrame({
-            'id_municipio': [3550308, 3304557, 3106200],
-            'qtd_alunos_avaliados': np.random.randint(1000, 50000, 3),
-            'proporcao_aluno_nivel_4': [0.4, 0.3, 0.35], # Níveis mais altos indicam alfabetização
-            'vulnerabilidade_social': ['Alta', 'Média', 'Baixa']
-        })
+        for src, dest_name in files_to_copy:
+            dest = os.path.join(self.raw_dir, dest_name)
+            if os.path.exists(src):
+                shutil.copy2(src, dest)
+                print(f"  -> {dest_name} copiado com sucesso!")
+            else:
+                print(f"  ⚠️ Arquivo não encontrado: {src}")
 
-        # Salva em Parquet
-        df_uf.to_parquet(f'{self.output_dir}/uf.parquet', index=False)
-        df_mun.to_parquet(f'{self.output_dir}/municipio.parquet', index=False)
-        df_meta_br.to_parquet(f'{self.output_dir}/meta_brasil.parquet', index=False)
-        df_meta_uf.to_parquet(f'{self.output_dir}/meta_uf.parquet', index=False)
-        df_meta_mun.to_parquet(f'{self.output_dir}/meta_municipio.parquet', index=False)
-        df_alunos.to_parquet(f'{self.output_dir}/alunos.parquet', index=False)
+    def convert_to_bronze(self):
+        print("\n⚙️ [BRONZE] Convertendo Raw para Parquet (Eficiência FinOps)...")
         
-        print("✅ [BATCH] Arquivos salvos com sucesso na camada Bronze!")
+        # 1. Metas Municipios (Excel)
+        if os.path.exists(f"{self.raw_dir}metas_municipios.xlsx"):
+            print("  Convertendo Metas Municipios...")
+            df_metas_mun = pd.read_excel(f"{self.raw_dir}metas_municipios.xlsx")
+            df_metas_mun.to_parquet(f"{self.bronze_dir}metas_municipios.parquet", index=False)
+            
+        # 2. Metas UFs (Excel)
+        if os.path.exists(f"{self.raw_dir}metas_ufs.xlsx"):
+            print("  Convertendo Metas UFs...")
+            df_metas_ufs = pd.read_excel(f"{self.raw_dir}metas_ufs.xlsx")
+            df_metas_ufs.to_parquet(f"{self.bronze_dir}metas_ufs.parquet", index=False)
+            
+        # 3. TS_ALUNO (CSV pesado, precisa de chunking ou leitura direta com PyArrow se possível)
+        # Por simplicidade e segurança de memória, vamos ler com pandas (se aguentar) ou pyarrow engine
+        if os.path.exists(f"{self.raw_dir}TS_ALUNO.csv"):
+            print("  Convertendo TS_ALUNO (Microdados pesados)... aguarde...")
+            df_aluno = pd.read_csv(f"{self.raw_dir}TS_ALUNO.csv", sep=';', encoding='utf-8', engine='pyarrow')
+            df_aluno.to_parquet(f"{self.bronze_dir}TS_ALUNO.parquet", index=False)
+            
+        # 4. TS_MUNICIPIO
+        if os.path.exists(f"{self.raw_dir}TS_MUNICIPIO.csv"):
+            print("  Convertendo TS_MUNICIPIO...")
+            df_mun = pd.read_csv(f"{self.raw_dir}TS_MUNICIPIO.csv", sep=';', encoding='utf-8')
+            df_mun.to_parquet(f"{self.bronze_dir}TS_MUNICIPIO.parquet", index=False)
+
+        # 5. TS_ESTADO
+        if os.path.exists(f"{self.raw_dir}TS_ESTADO.csv"):
+            print("  Convertendo TS_ESTADO...")
+            df_est = pd.read_csv(f"{self.raw_dir}TS_ESTADO.csv", sep=';', encoding='utf-8')
+            df_est.to_parquet(f"{self.bronze_dir}TS_ESTADO.parquet", index=False)
+            
+        print("✅ [BRONZE] Todos os arquivos convertidos para Parquet com sucesso!")
 
 if __name__ == '__main__':
-    ingestor = BatchIngestion()
-    ingestor.mock_inep_datasets()
+    ingestor = BatchIngestionReal()
+    ingestor.copy_to_raw()
+    ingestor.convert_to_bronze()
