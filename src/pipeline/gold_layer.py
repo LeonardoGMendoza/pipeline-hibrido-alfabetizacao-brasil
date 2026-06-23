@@ -1,49 +1,44 @@
-# Databricks notebook source / PySpark Script Local
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 import os
 
 class GoldLayer:
-    def __init__(self, silver_path='data/silver/indicador_alfabetizacao_silver.parquet'):
+    def __init__(self, silver_path='data/silver/indicador_alfabetizacao_integrado.parquet'):
         self.silver_path = silver_path
-        self.spark = SparkSession.builder.appName("Carga_Gold_Alfabetizacao").getOrCreate()
+        self.spark = SparkSession.builder.appName("Carga_Gold_Alfabetizacao_V2").getOrCreate()
 
     def processar_gold(self):
-        print("Iniciando motor PySpark - Camada Gold (Agregações)...")
+        print("🏆 [GOLD] Iniciando agregação final...")
         try:
-            # Leitura da Camada Silver
             df_silver = self.spark.read.parquet(self.silver_path)
             
-            # 1. Regra de Negócio Padrão do SAEB (743 pontos)
-            # Definir quem atingiu a meta
+            # Aplica Regra de Negócio: O Indicador Nacional é 743 pts
+            # Como a tabela da BD já traz taxa_alfabetizacao, validamos se a meta foi batida
+            
             df_gold = df_silver.withColumn(
                 "status_alfabetizacao",
-                F.when(F.col("indicador_alfabetizacao") >= 743, "Alfabetizado (≥ 743 pts)")
-                 .otherwise("Atenção (< 743 pts)")
+                F.when(F.col("taxa_alfabetizacao") >= 74.3, "Meta Atingida (≥ 743 pts SAEB)")
+                 .otherwise("Atenção (< 743 pts SAEB)")
             )
             
-            # 2. Agregação Analítica Nível 1: Visão por Estado
-            # Aqui poderíamos cruzar com uma tabela de metas, mas vamos simplificar o motor
-            df_estado = df_gold.groupBy("ano", "sigla_uf") \
-                .agg(
-                    F.round(F.avg("indicador_alfabetizacao"), 2).alias("proficiencia_media"),
-                    F.count("id_municipio").alias("qtd_municipios_valiados")
-                )
-                
-            # O dataframe principal que vai pro dashboard (ou Caio/MongoDB) será o df_gold
-            # com colunas selecionadas para facilitar.
+            # Agregações Analíticas para o Dashboard e IA
+            df_analitico = df_gold.select(
+                F.col("nome_municipio").alias("municipio"),
+                F.col("sigla_uf").alias("estado"),
+                F.col("taxa_alfabetizacao").alias("proficiencia_media"),
+                "qtd_alunos_avaliados",
+                "vulnerabilidade_social",
+                "status_alfabetizacao"
+            )
             
-            # Persistência do Cubo Principal
             os.makedirs('data/gold', exist_ok=True)
             output_path = 'data/gold/indicador_alfabetizacao.parquet'
             
-            # Em Pandas salvaríamos CSV, no Spark salvamos Parquet para o NoSQL ler
-            df_gold.write.mode("overwrite").parquet(output_path)
-            
-            print(f"Camada Gold processada com sucesso no Spark.")
+            df_analitico.write.mode("overwrite").parquet(output_path)
+            print("✅ [GOLD] Camada Gold finalizada! Dados prontos para Streamlit e MongoDB.")
             return True
         except Exception as e:
-            print(f"Erro no processamento Gold: {e}")
+            print(f"❌ Erro no processamento Gold: {e}")
             return False
 
 if __name__ == '__main__':

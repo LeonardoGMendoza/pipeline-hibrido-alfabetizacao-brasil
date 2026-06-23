@@ -4,57 +4,54 @@ from pyspark.sql import functions as F
 import os
 
 class SilverLayer:
-    def __init__(self, bronze_path='data/bronze/indicador_alfabetizacao_raw.parquet'):
-        self.bronze_path = bronze_path
-        self.spark = SparkSession.builder.appName("Carga_Silver_Alfabetizacao").getOrCreate()
+    def __init__(self, bronze_dir='data/bronze/'):
+        self.bronze_dir = bronze_dir
+        # Configuração do Spark com gerenciamento de memória (FinOps local)
+        self.spark = SparkSession.builder \
+            .appName("Carga_Silver_Alfabetizacao_V2") \
+            .config("spark.sql.shuffle.partitions", "4") \
+            .getOrCreate()
 
     def processar_silver(self):
-        print("Iniciando motor PySpark - Camada Silver...")
+        print("⚙️ [SILVER] Iniciando processamento PySpark - Limpeza e JOINs...")
         try:
-            # Leitura da Camada Bronze
-            df_bronze = self.spark.read.parquet(self.bronze_path)
+            # 1. Leitura das 6 tabelas Bronze
+            df_uf = self.spark.read.parquet(f"{self.bronze_dir}uf.parquet")
+            df_mun = self.spark.read.parquet(f"{self.bronze_dir}municipio.parquet")
+            df_meta_br = self.spark.read.parquet(f"{self.bronze_dir}meta_brasil.parquet")
+            df_meta_uf = self.spark.read.parquet(f"{self.bronze_dir}meta_uf.parquet")
+            df_meta_mun = self.spark.read.parquet(f"{self.bronze_dir}meta_municipio.parquet")
+            df_alunos = self.spark.read.parquet(f"{self.bronze_dir}alunos.parquet")
             
-            # 1. Padronização de Colunas
-            colunas_padrao = [F.col(c).alias(c.lower().strip()) for c in df_bronze.columns]
-            df_silver = df_bronze.select(*colunas_padrao)
+            # 2. Limpeza e Padronização
+            df_mun = df_mun.dropna(subset=['id_municipio']).withColumn("nome_municipio", F.upper(F.col("nome")))
+            df_uf = df_uf.withColumn("nome_uf", F.upper(F.col("nome")))
             
-            # 2. Remoção de Nulos Críticos (Registros sem nota do SAEB)
-            df_silver = df_silver.dropna(subset=['indicador_alfabetizacao'])
+            # 3. Integração (JOINs)
+            # Cruza Municipio com UF
+            df_geo = df_mun.join(df_uf, "sigla_uf", "left").drop(df_uf.nome)
             
-            # 3. Tipagem de Dados e Limpeza de Strings
-            df_silver = df_silver.withColumn("sigla_uf", F.upper(F.trim(F.col("sigla_uf"))))
-            df_silver = df_silver.withColumn("rede", F.initcap(F.trim(F.col("rede"))))
+            # Cruza Geografia com Metas do Municipio
+            df_integrado = df_geo.join(df_meta_mun, "id_municipio", "inner")
             
-            # 4. Remoção de Duplicados Baseados na Chave Primária
-            chaves = ['ano', 'id_municipio', 'rede', 'localizacao']
-            df_silver = df_silver.dropDuplicates(subset=chaves)
+            # Cruza com Dados dos Alunos
+            df_integrado = df_integrado.join(df_alunos, "id_municipio", "left")
             
-            # 5. Adiciona Rastreabilidade
-            df_silver = df_silver.withColumn("_data_processamento", F.current_timestamp())
+            # 4. Regras de Qualidade
+            df_silver = df_integrado.dropDuplicates(["id_municipio", "ano", "rede"])
+            df_silver = df_silver.withColumn("_data_ingestao_silver", F.current_timestamp())
             
-            # Persistência
+            # 5. Persistência (Uso eficiente Parquet FinOps)
             os.makedirs('data/silver', exist_ok=True)
-            output_path = 'data/silver/indicador_alfabetizacao_silver.parquet'
+            output_path = 'data/silver/indicador_alfabetizacao_integrado.parquet'
             
-            # Em produção usaríamos overwrite ou append baseado no particionamento
             df_silver.write.mode("overwrite").parquet(output_path)
             
-            print(f"Camada Silver processada com sucesso no Spark.")
+            print("✅ [SILVER] Camada Silver processada e integrada com sucesso.")
             return True
         except Exception as e:
-            print(f"Erro no processamento Silver: {e}")
+            print(f"❌ Erro no processamento Silver: {e}")
             return False
 
 if __name__ == '__main__':
-    # Se rodar localmente para testes:
-    # Crie um Parquet fake de bronze se não existir
-    os.makedirs('data/bronze', exist_ok=True)
-    if not os.path.exists('data/bronze/indicador_alfabetizacao_raw.parquet'):
-        import pandas as pd
-        pd.DataFrame({
-            'ano': [2023, 2023], 'sigla_uf': ['SP', 'RJ'], 
-            'id_municipio': [3550308, 3304557], 'rede': ['Estadual', 'Municipal'],
-            'localizacao': ['Urbana', 'Rural'], 'indicador_alfabetizacao': [80.5, 74.3]
-        }).to_parquet('data/bronze/indicador_alfabetizacao_raw.parquet', index=False)
-        
     SilverLayer().processar_silver()
