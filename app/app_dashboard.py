@@ -32,13 +32,19 @@ st.markdown(
 )
 
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.database.aws_s3_connector import carregar_camada_gold_s3
+
 @st.cache_data(ttl=600)
 def carregar_dados():
-    if not DATA_PATH.exists():
-        return pd.DataFrame()
-
     try:
-        df = pd.read_parquet(DATA_PATH)
+        # O conector tenta ler da AWS S3, se falhar, lê do arquivo local (fallback automático)
+        df = carregar_camada_gold_s3()
+        
+        if df is None or df.empty:
+            return pd.DataFrame()
         for col in ["taxa_alfabetizacao", "proficiencia_media", "qtd_alunos_avaliados"]:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
