@@ -78,7 +78,6 @@ def carregar_dados():
 df = carregar_dados()
 
 st.title("🌌 Dashboard Nacional: Criança Alfabetizada")
-st.caption("Painel executivo com dados Gold prontos para análise e visualização")
 st.markdown("---")
 
 st.sidebar.header("🛸 Filtros Estratégicos")

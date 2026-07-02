@@ -12,9 +12,24 @@ np.random.seed(42)
 n_alunos = 10000
 
 df_mun_bronze = pd.DataFrame({
-    "CO_MUNICIPIO": [3550308, 3304557, 3106200, 4106902, 4314902],
-    "NO_MUNICIPIO": ["São Paulo", "Rio de Janeiro", "Belo Horizonte", "Curitiba", "Porto Alegre"],
-    "SG_UF": ["SP", "RJ", "MG", "PR", "RS"]
+    "CO_MUNICIPIO": [
+        1100205, 1200401, 1302603, 1400100, 1501402, 1600303, 1721000, 
+        2111300, 2211001, 2304400, 2408102, 2507507, 2611606, 2704302, 
+        2800308, 2927408, 3106200, 3205309, 3304557, 3550308, 4106902, 
+        4205407, 4314902, 5002704, 5103403, 5208707, 5300108
+    ],
+    "NO_MUNICIPIO": [
+        "Porto Velho", "Rio Branco", "Manaus", "Boa Vista", "Belém", "Macapá", "Palmas",
+        "São Luís", "Teresina", "Fortaleza", "Natal", "João Pessoa", "Recife", "Maceió",
+        "Aracaju", "Salvador", "Belo Horizonte", "Vitória", "Rio de Janeiro", "São Paulo", "Curitiba",
+        "Florianópolis", "Porto Alegre", "Campo Grande", "Cuiabá", "Goiânia", "Brasília"
+    ],
+    "SG_UF": [
+        "RO", "AC", "AM", "RR", "PA", "AP", "TO", 
+        "MA", "PI", "CE", "RN", "PB", "PE", "AL", 
+        "SE", "BA", "MG", "ES", "RJ", "SP", "PR", 
+        "SC", "RS", "MS", "MT", "GO", "DF"
+    ]
 })
 codigos_mun = df_mun_bronze["CO_MUNICIPIO"].tolist()
 
