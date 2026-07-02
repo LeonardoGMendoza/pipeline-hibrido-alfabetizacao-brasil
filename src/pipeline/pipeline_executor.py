@@ -11,26 +11,26 @@ import os
 # Adiciona a raiz ao path para garantir importação dos módulos sem erros de contexto
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from src.database.nosql_connector import salvar_camada_gold_nosql
+from src.database.aws_s3_connector import carregar_camada_gold_s3
 
 def executar_pipeline_completo():
     print("🏁 Iniciando Orquestração do Pipeline - Indicador Criança Alfabetizada...")
     
-    # 1. Ingestão Batch/Streaming (Simulação da Camada Bronze)
-    print("📥 [BRONZE] Coletando microdados educacionais e metas da Base dos Dados...")
+    # 1. Ingestão Batch/Streaming (Databricks)
+    print("📥 [BRONZE] Coletando microdados educacionais e metas do INEP na AWS S3...")
     
-    # 2. Processamento e Limpeza (Código do Leonardo)
-    print("⚙️ [SILVER] Executando rotinas de limpeza, tipagem e deduplicação...")
+    # 2. Processamento e Limpeza (Databricks)
+    print("⚙️ [SILVER] Executando rotinas de limpeza, tipagem e deduplicação no Cluster...")
     
-    # 3. Agregação e Cruzamento com a Meta do Saeb (743 pontos)
-    print("🏅 [GOLD] Consolidando tabelas analíticas para consumo do Dashboard...")
+    # 3. Agregação e Cruzamento com a Meta do Saeb (Databricks)
+    print("🏅 [GOLD] Consolidando tabelas analíticas (Parquet) na AWS S3...")
     
-    # 4. Exportação NoSQL (Código do Caio)
-    print("🔌 [NOSQL] Acionando conector para persistência na camada de armazenamento...")
-    conexao_string = "mongodb://localhost:27017/fiap_tech_challenge"
-    salvar_camada_gold_nosql(df_gold=None, connection_string=conexao_string)
+    # 4. Consumo S3 (Código do Caio)
+    print("🔌 [AWS S3] Acionando conector para carregar a camada Gold no Dashboard...")
+    df_dashboard = carregar_camada_gold_s3()
     
-    print("✅ Pipeline executado com sucesso e dados disponíveis para o Dashboard!")
+    if df_dashboard is not None:
+        print("✅ Pipeline executado com sucesso e dados disponíveis para o Dashboard!")
 
 if __name__ == "__main__":
     executar_pipeline_completo()
