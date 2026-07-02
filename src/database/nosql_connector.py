@@ -1,32 +1,47 @@
-import pandas as pd
-from pymongo import MongoClient
+import pymongo
+import json
 import os
+import pandas as pd
 
-class MongoDBConnector:
-    def __init__(self, uri="mongodb://187.77.32.137:27017/", db_name="analytics_alfabetizacao"):
-        self.client = MongoClient(uri)
-        self.db = self.client[db_name]
+def salvar_camada_gold_nosql(df_gold, connection_string, collection_name="municipios_completo"):
+    """
+    Função desenvolvida por Caio.
+    Recebe um DataFrame (idealmente PySpark, mas adaptado aqui para dicionários/Pandas)
+    e persiste na camada Gold do MongoDB.
+    """
+    try:
+        print("🔌 Conectando ao MongoDB...")
+        client = pymongo.MongoClient(connection_string)
+        db = client.get_database() # Pega o banco da string de conexão
+        colecao = db[collection_name]
         
-    def carregar_gold_para_mongo(self, parquet_path='data/gold/indicador_alfabetizacao.parquet'):
-        print("Conectando ao MongoDB no Servidor Ubuntu...")
-        collection = self.db['municipios_completo'] # Usando nova coleção para os dados das 6 tabelas
+        print(f"🗑️ Limpando coleção anterior ({collection_name})...")
+        colecao.delete_many({})
         
-        # Limpa os dados anteriores para garantir atualização limpa
-        collection.delete_many({})
-        
-        if not os.path.exists(parquet_path):
-            print(f"Erro: Arquivo {parquet_path} não encontrado. Rode o pipeline PySpark primeiro.")
-            return False
+        print(f"💾 Inserindo {len(df_gold)} registros na camada NoSQL...")
+        # Se for um dataframe Pandas, convertemos para dict
+        if hasattr(df_gold, "to_dict"):
+            records = df_gold.to_dict("records")
+        else:
+            records = df_gold
             
-        # Lendo os dados finais do pipeline PySpark
-        print("Lendo os dados processados pelo PySpark (Camada Gold)...")
-        df = pd.read_parquet(parquet_path)
+        colecao.insert_many(records)
+        print("✅ Dados persistidos no MongoDB com sucesso!")
         
-        registros = df.to_dict('records')
-        collection.insert_many(registros)
-        print(f"Sucesso! A ponte funcionou: {len(registros)} documentos foram inseridos na coleção NoSQL do seu servidor Ubuntu.")
-        return True
+    except Exception as e:
+        print(f"❌ Erro ao salvar no MongoDB: {e}")
 
-if __name__ == '__main__':
-    mongo = MongoDBConnector()
-    mongo.carregar_gold_para_mongo()
+# Script para popular o banco localmente (Simulando o fim do Pipeline PySpark)
+if __name__ == "__main__":
+    # Pegando o caminho do parquet da Gold
+    caminho_gold = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "gold", "indicador_alfabetizacao.parquet")
+    
+    if os.path.exists(caminho_gold):
+        print(f"Lendo dados processados (Camada Gold): {caminho_gold}")
+        df = pd.read_parquet(caminho_gold)
+        
+        # Conexão com o IP do servidor Ubuntu incluindo o database no final da URI
+        conexao = "mongodb://187.77.32.137:27017/analytics_alfabetizacao"
+        salvar_camada_gold_nosql(df, conexao)
+    else:
+        print("❌ Arquivo Parquet da camada Gold não encontrado. Execute o pipeline local primeiro.")
