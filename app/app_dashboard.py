@@ -54,6 +54,10 @@ def carregar_dados():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
 
+        # Se não existir a taxa (porque veio do simulador Medallion), cria uma derivada da proficiência
+        if "taxa_alfabetizacao" not in df.columns and "proficiencia_media" in df.columns:
+            df["taxa_alfabetizacao"] = (df["proficiencia_media"] / 10).round(1)
+
         if "status_alfabetizacao" not in df.columns:
             df["status_alfabetizacao"] = "Não informado"
         if "vulnerabilidade_social" not in df.columns:
