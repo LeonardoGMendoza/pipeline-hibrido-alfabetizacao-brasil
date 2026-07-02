@@ -9,3 +9,7 @@ numpy>=1.24.0
 # Conectores de Banco de Dados NoSQL (Caio)
 pymongo>=4.5.0
 redis>=5.0.0
+
+# Conectores de Cloud (AWS e Parquet)
+boto3>=1.26.0
+pyarrow>=10.0.0
