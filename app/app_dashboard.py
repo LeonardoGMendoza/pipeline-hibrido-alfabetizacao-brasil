@@ -40,8 +40,13 @@ from src.database.aws_s3_connector import carregar_camada_gold_s3
 @st.cache_data(ttl=600)
 def carregar_dados():
     try:
-        # O conector tenta ler da AWS S3, se falhar, lê do arquivo local (fallback automático)
-        df = carregar_camada_gold_s3()
+        # Se tivermos os dados temporais (simulação), carrega eles!
+        caminho_temporal = ROOT / "data" / "gold" / "indicador_alfabetizacao_temporal.parquet"
+        if caminho_temporal.exists():
+            df = pd.read_parquet(caminho_temporal)
+        else:
+            # O conector tenta ler da AWS S3, se falhar, lê do arquivo local (fallback automático)
+            df = carregar_camada_gold_s3()
         
         if df is None or df.empty:
             return pd.DataFrame()
@@ -80,6 +85,13 @@ if df.empty:
         "Ainda não há dados Gold disponíveis. Gere o parquet em data/gold ou execute a pipeline para popular este painel."
     )
 else:
+    # Filtro de Ano (Simulação de Streaming/Batch)
+    ano_selecionado = None
+    if "ano" in df.columns:
+        lista_anos = sorted(df["ano"].dropna().unique().tolist(), reverse=True)
+        ano_selecionado = st.sidebar.selectbox("📅 Selecione o Ano (Simulação):", lista_anos, index=0)
+        st.sidebar.markdown("*(2023-2025 = Histórico Batch | 2026 = Novo Streaming)*")
+
     lista_ufs = sorted(df["sigla_uf"].dropna().astype(str).unique().tolist())
     uf_selecionada = st.sidebar.multiselect("Filtrar por Estado (UF):", lista_ufs, default=lista_ufs)
 
@@ -87,6 +99,8 @@ else:
     status_selecionado = st.sidebar.multiselect("Filtrar por Status Saeb:", lista_status, default=lista_status)
 
     df_filtrado = df.copy()
+    if ano_selecionado:
+        df_filtrado = df_filtrado[df_filtrado["ano"] == ano_selecionado]
     if uf_selecionada:
         df_filtrado = df_filtrado[df_filtrado["sigla_uf"].astype(str).isin(uf_selecionada)]
     if status_selecionado:
