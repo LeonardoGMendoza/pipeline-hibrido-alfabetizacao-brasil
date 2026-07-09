@@ -29,17 +29,17 @@ graph TD
         C[Metas Nacionais Excel]
     end
 
-    subgraph AWS_Databricks [Nuvem: AWS S3 + Databricks]
+    subgraph AWS_Databricks [Nuvem: AWS S3 e Databricks]
         D[(AWS S3: Camada Bronze<br>Parquet Bruto)]
         A -->|Upload| D
         B -->|Upload| D
         C -->|Upload| D
         
         E[(AWS S3: Camada Silver<br>Dados Limpos e JOINs)]
-        D -->|Processamento em Databricks/PySpark| E
+        D -->|Processamento via Databricks| E
         
-        F[(AWS S3: Camada Gold<br>Tabela Analítica)]
-        E -->|Regras de Negócio (Databricks)| F
+        F[(AWS S3: Camada Gold<br>Tabela Analitica)]
+        E -->|Regras de Negocio no Databricks| F
     end
 
     subgraph Frontend [Aplicação do Usuário]
