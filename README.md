@@ -23,30 +23,30 @@ Abaixo apresentamos o fluxo arquitetural de dados do nosso projeto, desenhado pa
 
 ```mermaid
 graph TD
-    subgraph Origens_Governamentais ["Origens Transacionais"]
-        A["Microdados Alunos CSV"]
-        B["Tabela Municípios CSV"]
-        C["Metas Nacionais Excel"]
-        S["Simulador de Streaming<br>Eventos em Tempo Real"]
+    subgraph Origens_Governamentais [Origens Transacionais]
+        A[Microdados Alunos CSV]
+        B[Tabela Municípios CSV]
+        C[Metas Nacionais Excel]
+        S[Simulador de Streaming<br>Eventos em Tempo Real]
     end
 
-    subgraph AWS_Databricks ["Nuvem: AWS S3 e Databricks"]
-        D[("AWS S3: Camada Bronze<br>Parquet Bruto")]
-        A -->|"Upload Batch"| D
-        B -->|"Upload Batch"| D
-        C -->|"Upload Batch"| D
+    subgraph AWS_Databricks [Nuvem: AWS S3 e Databricks]
+        D[(AWS S3: Camada Bronze<br>Parquet Bruto)]
+        A -->|Upload Batch| D
+        B -->|Upload Batch| D
+        C -->|Upload Batch| D
         
-        E[("AWS S3: Camada Silver<br>Dados Limpos e JOINs")]
-        D -->|"Processamento via Databricks"| E
-        S -->|"Ingestão Contínua"| E
+        E[(AWS S3: Camada Silver<br>Dados Limpos e JOINs)]
+        D -->|Processamento via Databricks| E
+        S -->|Ingestão Contínua| E
         
-        F[("AWS S3: Camada Gold<br>Tabela Analitica")]
-        E -->|"Regras de Negocio no Databricks"| F
+        F[(AWS S3: Camada Gold<br>Tabela Analitica)]
+        E -->|Regras de Negocio no Databricks| F
     end
 
-    subgraph Frontend ["Aplicação do Usuário"]
-        H["Dashboard Streamlit<br>Painel Executivo"]
-        F -->|"Leitura Direta"| H
+    subgraph Frontend [Aplicação do Usuário]
+        H[Dashboard Streamlit<br>Painel Executivo]
+        F -->|Leitura Direta| H
     end
 
     %% Estilizacao de Cores (Medallion e Ferramentas)
