@@ -48,6 +48,13 @@ graph TD
         H["Dashboard Streamlit<br>Painel Executivo"]
         F -->|"Leitura Direta"| H
     end
+
+    %% Estilizacao de Cores (Medallion e Ferramentas)
+    style D fill:#b87333,stroke:#fff,stroke-width:2px,color:#fff
+    style E fill:#bdc3c7,stroke:#fff,stroke-width:2px,color:#000
+    style F fill:#f1c40f,stroke:#fff,stroke-width:2px,color:#000
+    style S fill:#8e44ad,stroke:#fff,stroke-width:2px,color:#fff
+    style H fill:#ff4b4b,stroke:#fff,stroke-width:2px,color:#fff
 ```
 
 ---
