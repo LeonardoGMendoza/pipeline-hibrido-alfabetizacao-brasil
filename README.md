@@ -27,13 +27,16 @@ graph TD
         A[Microdados Alunos CSV]
         B[Tabela Municípios CSV]
         C[Metas Nacionais Excel]
+        S[Simulador de Streaming<br>Eventos em Tempo Real]
     end
 
     subgraph AWS_Databricks [Nuvem: AWS S3 e Databricks]
         D[(AWS S3: Camada Bronze<br>Parquet Bruto)]
-        A -->|Upload| D
-        B -->|Upload| D
-        C -->|Upload| D
+        A -->|Upload Batch| D
+        B -->|Upload Batch| D
+        C -->|Upload Batch| D
+        
+        S -->|Ingestão Contínua| E
         
         E[(AWS S3: Camada Silver<br>Dados Limpos e JOINs)]
         D -->|Processamento via Databricks| E
@@ -47,6 +50,14 @@ graph TD
         F -->|Leitura Direta| H
     end
 ```
+
+---
+
+## 🔄 Justificativa da Arquitetura Híbrida (Batch vs Streaming)
+
+Atendendo aos requisitos de um **Pipeline Híbrido**, o projeto combina duas abordagens de ingestão:
+- **Batch**: Utilizado para fontes históricas e de baixa frequência de atualização (Metas Nacionais, Cadastro de Municípios), processadas periodicamente na camada Bronze.
+- **Streaming**: Implementado através do script `src/ingestion/streaming_simulator.py`. Para simular a chegada de novas avaliações de alunos quase em tempo real, criamos um Producer em Python que injeta eventos contínuos no fluxo. **Decisão de Arquitetura (FinOps):** Optamos por construir um simulador em Python (dispensando a infraestrutura complexa do Apache Kafka) por ser uma solução mais aderente (leve e econômica) ao volume de dados da simulação, garantindo excelente relação custo-benefício e alinhamento com as melhores práticas operacionais.
 
 ---
 
